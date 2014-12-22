@@ -19,6 +19,9 @@ d3.js: $(shell node_modules/.bin/smash --ignore-missing --list src/d3.js) packag
 	node_modules/.bin/smash src/d3.js | node_modules/.bin/uglifyjs - -b indent-level=2 -o $@
 	@chmod a-w $@
 
+# make d3.js 
+# is the command to generate uncompressed d3 library
+
 d3.min.js: d3.js bin/uglify
 	@rm -f $@
 	bin/uglify $< > $@

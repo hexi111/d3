@@ -7252,6 +7252,230 @@
       dy: dy
     };
   }
+  d3.layout.tiltedtree = function() {
+    var hierarchy = d3.layout.hierarchy().sort(null).value(null), separation = d3_layout_treeSeparation, size = [ 1, 1 ], nodeSize = null;
+    var DIST = 2;
+    function tree(d, i) {
+      var nodes = hierarchy.call(this, d, i), root0 = nodes[0], root1 = wrapTree(root0);
+      d3_layout_hierarchyVisitAfter(root1, firstWalk);
+      root1.parent.m = 0;
+      root1.parent.g = 0;
+      d3_layout_hierarchyVisitBefore(root1, secondWalk);
+      d3_layout_hierarchyVisitBefore(root1, thirdWalk);
+      if (nodeSize) d3_layout_hierarchyVisitBefore(root0, sizeNode); else {
+        var left = root0, right = root0, top = root0, bottom = root0;
+        d3_layout_hierarchyVisitBefore(root0, function(node) {
+          if (node.x < left.x) left = node;
+          if (node.x > right.x) right = node;
+          if (node.y < top.y) top = node;
+          if (node.y > bottom.y) bottom = node;
+        });
+        var tx = separation(left, right) / 2 - left.x, kx = size[0] / (right.x + separation(right, left) / 2 + tx);
+        var ty = separation(bottom, top) / 2 - top.y, ky = size[1] / (bottom.y + DIST / 2 + ty);
+        d3_layout_hierarchyVisitBefore(root0, function(node) {
+          node.x = (node.x + tx) * kx;
+          node.y = (node.y + ty) * ky;
+        });
+      }
+      return nodes;
+    }
+    function wrapTree(root0) {
+      var root1 = {
+        A: null,
+        children: [ root0 ]
+      }, queue = [ root1 ], node1;
+      while ((node1 = queue.pop()) != null) {
+        for (var children = node1.children, child, i = 0, n = children.length; i < n; ++i) {
+          queue.push((children[i] = child = {
+            _: children[i],
+            parent: node1,
+            children: (child = children[i].children) && child.slice() || [],
+            A: null,
+            a: null,
+            z: 0,
+            m: 0,
+            c: 0,
+            s: 0,
+            t: null,
+            h: 0,
+            g: 0,
+            l: 0,
+            level: 0,
+            i: i
+          }).a = child);
+        }
+      }
+      return root1.children[0];
+    }
+    function firstWalk(v) {
+      var children = v.children, siblings = v.parent.children, w = v.i ? siblings[v.i - 1] : null;
+      if (children.length == 0) {
+        v.l = 1;
+      } else {
+        for (var i = 0; i < children.length; i++) {
+          v.l = v.l + children[i].l;
+        }
+      }
+      var maxlevel;
+      if (children.length == 0) {
+        v.level = 1;
+      } else {
+        maxlevel = children[0].level;
+        for (var i = 1; i < children.length; i++) {
+          if (maxlevel < children[i].level) {
+            maxlevel = children[i].level;
+          }
+        }
+        v.level = maxlevel + 1;
+      }
+      if (children.length) {
+        var midpoint = (children[0].z + children[children.length - 1].z) / 2;
+        v.z = midpoint;
+      } else if (w) {
+        v.z = w.z + separation(v._, w._);
+      }
+      if (children.length) {
+        var min_children;
+        min_children = children[0].h + children[0].g;
+        for (var i = 1; i < children.length; i++) {
+          if (min_children > children[i].h + children[i].g) {
+            min_children = children[i].h + children[i].g;
+          }
+        }
+        v.h = min_children - DIST;
+        if (w) {
+          v.g = w.g + DIST * w.l;
+        }
+      } else if (w) {
+        v.h = w.h + DIST;
+      }
+      if (w) {
+        apportion_mod(v, w);
+      }
+    }
+    function secondWalk(v) {
+      v.m += v.parent.m;
+      v._.x = v.z + v.m;
+      v.g += v.parent.g;
+      v._.y = v.h + v.g;
+    }
+    function thirdWalk(v) {
+      var i;
+      var spots;
+      var level;
+      var loc;
+      for (i = 0; i < v.children.length; i++) {
+        if (v.children[i].level > 1) {
+          spots = (v.children[i]._.y - v._.y) / DIST - 1;
+          loc = Math.ceil(spots / v.children[i].level);
+          v.children[i]._.y = v._.y + loc * DIST;
+        }
+      }
+    }
+    function apportion(v, w, ancestor) {
+      if (w) {
+        var vip = v, vop = v, vim = w, vom = vip.parent.children[0], sip = vip.m, sop = vop.m, sim = vim.m, som = vom.m, shift;
+        while (vim = d3_layout_treeRight(vim), vip = d3_layout_treeLeft(vip), vim && vip) {
+          vom = d3_layout_treeLeft(vom);
+          vop = d3_layout_treeRight(vop);
+          vop.a = v;
+          shift = vim.z + sim - vip.z - sip + separation(vim._, vip._);
+          if (shift > 0) {
+            d3_layout_treeMove(d3_layout_treeAncestor(vim, v, ancestor), v, shift);
+            sip += shift;
+            sop += shift;
+          }
+          sim += vim.m;
+          sip += vip.m;
+          som += vom.m;
+          sop += vop.m;
+        }
+        if (vim && !d3_layout_treeRight(vop)) {
+          vop.t = vim;
+          vop.m += sim - sop;
+        }
+        if (vip && !d3_layout_treeLeft(vom)) {
+          vom.t = vip;
+          vom.m += sip - som;
+          ancestor = v;
+        }
+      }
+      return ancestor;
+    }
+    function apportion_mod(v, w) {
+      var tmp1;
+      var mod1 = 0;
+      tmp1 = w;
+      while (tmp1.children.length > 0) {
+        tmp1 = tmp1.children[tmp1.children.length - 1];
+        mod1 += tmp1.m;
+      }
+      var tmp2;
+      var mod2 = 0;
+      tmp2 = v;
+      while (tmp2.children.length > 0) {
+        tmp2 = tmp2.children[0];
+        mod2 += tmp2.m;
+      }
+      var dis = mod1 + tmp1.z + separation(v._, w._) - mod2 - tmp2.z;
+      v.z = v.z + dis;
+      var i;
+      for (i = 0; i < v.children.length; i++) {
+        v.children[i].m = dis + v.children[i].m;
+      }
+    }
+    function sizeNode(node) {
+      node.x *= size[0];
+      node.y = node.depth * size[1];
+    }
+    tree.separation = function(x) {
+      if (!arguments.length) return separation;
+      separation = x;
+      return tree;
+    };
+    tree.size = function(x) {
+      if (!arguments.length) return nodeSize ? null : size;
+      nodeSize = (size = x) == null ? sizeNode : null;
+      return tree;
+    };
+    tree.nodeSize = function(x) {
+      if (!arguments.length) return nodeSize ? size : null;
+      nodeSize = (size = x) == null ? null : sizeNode;
+      return tree;
+    };
+    return d3_layout_hierarchyRebind(tree, hierarchy);
+  };
+  function d3_layout_treeSeparation(a, b) {
+    return a.parent == b.parent ? 1 : 2;
+  }
+  function d3_layout_treeLeft(v) {
+    var children = v.children;
+    return children.length ? children[0] : v.t;
+  }
+  function d3_layout_treeRight(v) {
+    var children = v.children, n;
+    return (n = children.length) ? children[n - 1] : v.t;
+  }
+  function d3_layout_treeMove(wm, wp, shift) {
+    var change = shift / (wp.i - wm.i);
+    wp.c -= change;
+    wp.s += shift;
+    wm.c += change;
+    wp.z += shift;
+    wp.m += shift;
+  }
+  function d3_layout_treeShift(v) {
+    var shift = 0, change = 0, children = v.children, i = children.length, w;
+    while (--i >= 0) {
+      w = children[i];
+      w.z += shift;
+      w.m += shift;
+      shift += w.s + (change += w.c);
+    }
+  }
+  function d3_layout_treeAncestor(vim, v, ancestor) {
+    return vim.a.parent === v.parent ? vim.a : ancestor;
+  }
   d3.random = {
     normal: function(µ, σ) {
       var n = arguments.length;
