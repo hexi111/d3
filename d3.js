@@ -7332,7 +7332,9 @@
         var midpoint = (children[0].z + children[children.length - 1].z) / 2;
         v.z = midpoint;
       } else if (w) {
-        v.z = w.z + separation(v._, w._);
+        if (w.children.length == 0) {
+          v.z = w.z + separation(v._, w._);
+        }
       }
       if (children.length) {
         var min_children;
@@ -7347,7 +7349,13 @@
           v.g = w.g + DIST * w.l;
         }
       } else if (w) {
-        v.h = w.h + DIST;
+        var tmp11 = 0;
+        var tmp111 = w;
+        while (tmp111.children.length != 0) {
+          tmp11 += tmp111.g;
+          tmp111 = tmp111.children[tmp111.children.length - 1];
+        }
+        v.g = tmp111.h + DIST + tmp11;
       }
       if (w) {
         apportion_mod(v, w);
@@ -7367,8 +7375,8 @@
       for (i = 0; i < v.children.length; i++) {
         if (v.children[i].level > 1) {
           spots = (v.children[i]._.y - v._.y) / DIST - 1;
-          loc = Math.ceil(spots / v.children[i].level);
-          v.children[i]._.y = v._.y + loc * DIST;
+          loc = Math.floor(spots / v.children[i].level);
+          v.children[i]._.y = v._.y + (1 + loc) * DIST;
         }
       }
     }
