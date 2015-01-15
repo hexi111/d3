@@ -7355,7 +7355,7 @@
           tmp11 += tmp111.g;
           tmp111 = tmp111.children[tmp111.children.length - 1];
         }
-        v.g = tmp111.h + DIST + tmp11;
+        v.g = tmp111.h + DIST + tmp11 + tmp111.g;
       }
       if (w) {
         apportion_mod(v, w);
